@@ -30,37 +30,34 @@ ArcCW.AmmoEntToArcCW = {
     ["ammo_gaussclip"] = "arccw_ammo_ar2_large"
 }
 
-function ArcCW:AddGrenadeAmmo()
-    if GetConVar("arccw_equipmentammo"):GetBool() and !GetConVar("arccw_equipmentsingleton"):GetBool() then
-        for i, k in pairs(weapons.GetList()) do
-            local class = k.ClassName
-            local wpntbl = weapons.Get(class)
+-- In listen/dedi servers client won't have replicated convars at Initialize yet
+-- Do this in InitPostEntity instead to prevent client from not generating ammo
+hook.Add("InitPostEntity", "ArcCW_AddGrenadeAmmo", function()
+	for i, k in pairs(weapons.GetList()) do
+		local class = k.ClassName
+		local wpntbl = weapons.Get(class)
 
-            if (wpntbl.Throwing or wpntbl.Disposable) and !wpntbl.Singleton and !wpntbl.DoNotEquipmentAmmo then
-                local ammoid = game.GetAmmoID(class)
+		if (wpntbl.Throwing or wpntbl.Disposable) and !wpntbl.Singleton and !wpntbl.DoNotEquipmentAmmo then
+			local ammoid = game.GetAmmoID(class)
 
-                if ammoid == -1 then
-                    -- if ammo type does not exist, build it
-                    game.AddAmmoType({
-                        name = class,
-                    })
-                    print("ArcCW adding ammo type " .. class)
-                    if CLIENT then
-                        language.Add(class .. "_ammo", wpntbl.PrintName)
-                    end
-                end
+			if ammoid == -1 then
+				-- if ammo type does not exist, build it
+				game.AddAmmoType({
+					name = class,
+				})
+				print("ArcCW adding ammo type " .. class)
+				if CLIENT then
+					language.Add(class .. "_ammo", wpntbl.PrintName)
+				end
+			end
 
-                k.Primary.Ammo = class
-                k.OldAmmo = class
-            end
-        end
-    end
-end
-
-hook.Add("Initialize", "ArcCW_AddGrenadeAmmo", ArcCW.AddGrenadeAmmo)
+			k.Primary.Ammo = class
+			k.OldAmmo = class
+		end
+	end
+end)
 
 if SERVER then
-
     hook.Add( "OnEntityCreated", "ArcCW_AmmoReplacement", function(ent)
         if GetConVar("arccw_ammo_replace"):GetBool() and ArcCW.AmmoEntToArcCW[ent:GetClass()] then
             timer.Simple(0, function()

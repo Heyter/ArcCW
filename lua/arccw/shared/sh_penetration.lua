@@ -20,40 +20,8 @@ function ArcCW:GetRicochetChance(penleft, tr)
     return math.Clamp(c, 0, 100)
 end
 
-function ArcCW:IsPenetrating(ptr, ptrent)
-    if ptrent:IsWorld() then
-        return !ptr.StartSolid or ptr.AllSolid
-    elseif IsValid(ptrent) then
-        local mins, maxs = ptrent:WorldSpaceAABB()
-        local withinbounding = ptr.HitPos:WithinAABox(mins, maxs)
-        if withinbounding and GetConVar("developer"):GetBool() then
-            --debugoverlay.Box(Vector(0, 0, 0), mins, maxs, 5, Color(255, 255, 255, 50))
-            debugoverlay.Sphere(ptr.HitPos, 1, 5, Color(255, 255, 0), true)
-        end
-        if withinbounding then return true end
-        --[[]
-        -- Check whether the point is inside the hitbox
-        -- Requires some math that I can't be bothered to solve
-        if ptr.HitBox > 0 then
-            local mins2, maxs2 = ptrent:GetHitBoxBounds(ptr.HitBox, ptr.HitGroup)
-            local bonepos, boneang = ptrent:GetBonePosition(ptrent:GetHitBoxBone(ptr.HitBox, ptrent:GetHitboxSet()))
-            if GetConVar("developer"):GetBool() then
-                debugoverlay.BoxAngles(bonepos, mins2, maxs2, boneang, 5, Color(255, 255, 255, 50))
-                debugoverlay.Axis(bonepos, boneang, 16, 5, true)
-            end
-        end
-        ]]
-    end
-    return false
-end
-
 function ArcCW:DoPenetration(tr, damage, bullet, penleft, physical, alreadypenned)
-    local hitpos, startpos = tr.HitPos, tr.StartPos
-    local dir    = (hitpos - startpos):GetNormalized()
-
-    if CLIENT then
-        return
-    end
+    if CLIENT then return end
 
     if tr.HitSky then return end
 
@@ -64,6 +32,7 @@ function ArcCW:DoPenetration(tr, damage, bullet, penleft, physical, alreadypenne
     local skip = false
 
     local trent = tr.Entity
+    local hitpos, startpos = tr.HitPos, tr.StartPos
 
     local penmult     = ArcCW.PenTable[tr.MatType] or 1
     local pentracelen = 2
@@ -108,9 +77,7 @@ function ArcCW:DoPenetration(tr, damage, bullet, penleft, physical, alreadypenne
         skip = true
     end
 
-    if !GetConVar("arccw_enable_penetration"):GetBool() then return end
-
-    while !skip and penleft > 0 and ArcCW:IsPenetrating(ptr, ptrent) and ptr.Fraction < 1 and ptrent == curr_ent do
+    while !skip and penleft > 0 and (!ptr.StartSolid or ptr.AllSolid) and ptr.Fraction < 1 and ptrent == curr_ent do
         penleft = penleft - (pentracelen * penmult)
 
         td.start  = endpos
@@ -119,9 +86,7 @@ function ArcCW:DoPenetration(tr, damage, bullet, penleft, physical, alreadypenne
 
         ptr = util.TraceLine(td)
 
-        -- This is never called because curr_ent is never updated, genius
-        -- Damage is handled in abullet.Callback anyways
-        --[[]
+        -- This is apparently never called?
         if ptrent != curr_ent then
             ptrent = ptr.Entity
 
@@ -148,7 +113,6 @@ function ArcCW:DoPenetration(tr, damage, bullet, penleft, physical, alreadypenne
 
             debugoverlay.Line(endpos, endpos + (dir * pentracelen), 10, Color(0, 0, 255), true)
         end
-        ]]
 
         if GetConVar("developer"):GetBool() then
             local pdeltap = penleft / bullet.Penetration
@@ -160,7 +124,6 @@ function ArcCW:DoPenetration(tr, damage, bullet, penleft, physical, alreadypenne
         endpos = endpos + (dir * pentracelen)
 
         dir = dir + (VectorRand() * 0.025 * penmult)
-
     end
 
     if penleft > 0 then
@@ -176,7 +139,7 @@ function ArcCW:DoPenetration(tr, damage, bullet, penleft, physical, alreadypenne
 
         if physical then
             if !ptr.HitWorld then
-                alreadypenned[ptrent:EntIndex()] = true
+                alreadypenned[ptr.Entity:EntIndex()] = true
             end
 
             local newbullet = {}
@@ -198,7 +161,6 @@ function ArcCW:DoPenetration(tr, damage, bullet, penleft, physical, alreadypenne
             newbullet.Gravity = bullet.Gravity or 1
             newbullet.StartTime = bullet.StartTime or CurTime()
             newbullet.PhysBulletImpact = bullet.PhysBulletImpact or true
-            newbullet.Weapon = bullet.Weapon
 
             if bit.band( util.PointContents( endpos ), CONTENTS_WATER ) == CONTENTS_WATER then
                 newbullet.Underwater = true
@@ -222,37 +184,28 @@ function ArcCW:DoPenetration(tr, damage, bullet, penleft, physical, alreadypenne
             abullet.Callback = function(att, btr, dmg)
                 local dist = bullet.Travelled * ArcCW.HUToM
                 bullet.Travelled = bullet.Travelled + (btr.HitPos - endpos):Length()
-
-                if alreadypenned[btr.Entity:EntIndex()] then
+                if alreadypenned[ptr.Entity:EntIndex()] then
                     dmg:SetDamage(0)
                 else
                     dmg:SetDamageType(bullet.DamageType)
                     dmg:SetDamage(bullet.Weapon:GetDamage(dist, true) * pdelta, true)
                 end
-                alreadypenned[btr.Entity:EntIndex()] = true
+                alreadypenned[ptr.Entity:EntIndex()] = true
 
                 ArcCW:DoPenetration(btr, damage, bullet, penleft, false, alreadypenned)
 
                 if GetConVar("developer"):GetBool() then
                     debugoverlay.Line(endpos, endpos + dir * (btr.HitPos - endpos):Length(), 10, Color(150, 150, 150), true)
                 end
-
-                -- if !game.SinglePlayer() and CLIENT then
-                    local fx = EffectData()
-                    fx:SetStart(tr.HitPos)
-                    fx:SetOrigin(btr.HitPos)
-                    util.Effect("arccw_ricochet", fx)
-                -- end
             end
 
             attacker:FireBullets(abullet)
         end
 
-        --[[
-        local atk = bullet.Attacker
+        -- if tr.HitWorld then
 
-        local supbullet = {}
-            supbullet.Src      = hitpos
+            local supbullet = {}
+            supbullet.Src      = endpos
             supbullet.Dir      = -dir
             supbullet.Damage   = 0
             supbullet.Distance = 8
@@ -260,7 +213,7 @@ function ArcCW:DoPenetration(tr, damage, bullet, penleft, physical, alreadypenne
             supbullet.Force    = 0
 
             attacker:FireBullets(supbullet, true)
-        ]]
 
+        -- end
     end
 end

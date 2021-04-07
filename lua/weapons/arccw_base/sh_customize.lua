@@ -280,10 +280,6 @@ function SWEP:CreateCustomizeHUD()
             gui.EnableScreenClicker(false)
             span:Remove()
         end
-
-        if --[[self:GetState() != ArcCW.STATE_CUSTOMIZE or]] self:GetReloading() then
-            span:Remove()
-        end
     end
     ArcCW.InvHUD.ActiveWeapon = self
     ArcCW.InvHUD.OnRemove = function()
@@ -305,8 +301,6 @@ function SWEP:CreateCustomizeHUD()
                 self:ToggleCustomizeHUD(false)
             end
         end
-
-        gui.EnableScreenClicker(false)
     end
 
     if GetConVar("arccw_attinv_onlyinspect"):GetBool() then
@@ -988,10 +982,10 @@ function SWEP:CreateCustomizeHUD()
 
                         if spaa.AttName == "" then
                             self:DetachAllMergeSlots(span.AttIndex)
-                        else
-                            self:DetachAllMergeSlots(span.AttIndex, true)
-                            self:Attach(aslot, spaa.AttName)
-                        end
+                        elseif span.AttSlot.Installed != spaa.AttName then
+							self:DetachAllMergeSlots(span.AttIndex, true)
+							self:Attach(aslot, spaa.AttName)
+						end
                     elseif kc2 == MOUSE_RIGHT and spaa.AttName != "" then
                         if span.AttSlot.Installed == spaa.AttName then
                             -- Unequip

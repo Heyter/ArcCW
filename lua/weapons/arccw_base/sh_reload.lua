@@ -40,6 +40,8 @@ function SWEP:Reload()
     if self.Throwing then return end
     if self.PrimaryBash then return end
 
+	local jammed = self:IsJammed()
+
     if self:HasBottomlessClip() then return end
 
     -- with the lite 3D HUD, you may want to check your ammo without reloading
@@ -51,15 +53,13 @@ function SWEP:Reload()
     -- Don't accidently reload when changing firemode
     if self:GetOwner():GetInfoNum("arccw_altfcgkey", 0) == 1 and self:GetOwner():KeyDown(IN_USE) then return end
 
-    if self:Ammo1() <= 0 then return end
+    if !jammed and self:Ammo1() <= 0 then return end
 
-    if self:GetBuff_Hook("Hook_PreReload") then return end
+    self:GetBuff_Hook("Hook_PreReload")
 
     self.LastClip1 = self:Clip1()
 
-    local reserve = self:Ammo1()
-
-    reserve = reserve + self:Clip1()
+    local reserve = self:Ammo1() + self:Clip1()
 
     local clip = self:GetCapacity()
 
@@ -67,7 +67,7 @@ function SWEP:Reload()
 
     local load = math.Clamp(clip + chamber, 0, reserve)
 
-    if load <= self:Clip1() then return end
+    if !jammed and load <= self:Clip1() then return end
 
     self:SetReqEnd(false)
     self:SetBurstCount(0)
@@ -88,7 +88,7 @@ function SWEP:Reload()
         local anim = "sgreload_start"
         local insertcount = 0
 
-        local empty = (self:Clip1() == 0) or self:GetNeedCycle()
+        local empty = (self:Clip1() == 0) or self:GetNeedCycle() or jammed
 
         if self.Animations.sgreload_start_empty and empty then
             anim = "sgreload_start_empty"
@@ -99,6 +99,10 @@ function SWEP:Reload()
             insertcount = (self.Animations.sgreload_start or {}).RestoreAmmo or 0
         end
 
+		if (jammed) then
+			insertcount = 0
+		end
+
         anim = self:GetBuff_Hook("Hook_SelectReloadAnimation", anim) or anim
 
         self:GetOwner():SetAmmo(self:Ammo1() - insertcount, self.Primary.Ammo)
@@ -107,8 +111,7 @@ function SWEP:Reload()
         self:PlayAnimation(anim, mult, true, 0, true, nil, true)
         self:SetReloading(CurTime() + (self:GetAnimKeyTime(anim) * mult))
 
-        self:SetTimer(self:GetAnimKeyTime(anim) * mult,
-        function()
+        self:SetTimer(self:GetAnimKeyTime(anim) * mult, function()
             self:ReloadInsert(empty)
         end)
     else
@@ -122,28 +125,33 @@ function SWEP:Reload()
             self:SetNeedCycle(false)
         end
 
-        if !self.Animations[anim] then print("Invalid animation \"" .. anim .. "\"") return end
+		if (self.Animations[anim]) then
+			self:PlayAnimation(anim, mult, true, 0, false, nil, true)
 
-        self:PlayAnimation(anim, mult, true, 0, false, nil, true)
+			local reloadtime = self:GetAnimKeyTime(anim, true) * mult
+			local reloadtime2 = self:GetAnimKeyTime(anim, false) * mult
 
-        local reloadtime = self:GetAnimKeyTime(anim, true) * mult
-        local reloadtime2 = self:GetAnimKeyTime(anim, false) * mult
+			if !self.Animations[anim].MinProgress then
+				-- needs to be here to fix empty idle related issues
+				reloadtime = reloadtime * 0.9
+			end
 
-        if !self.Animations[anim].MinProgress then
-            -- needs to be here to fix empty idle related issues
-            reloadtime = reloadtime * 0.9
-        end
+			self:SetNextPrimaryFire(CurTime() + reloadtime2)
+			self:SetReloading(CurTime() + reloadtime2)
 
-        self:SetNextPrimaryFire(CurTime() + reloadtime2)
-        self:SetReloading(CurTime() + reloadtime2)
-
-        self:SetMagUpIn(CurTime() + reloadtime)
+			self:SetMagUpIn(CurTime() + reloadtime)
+		end
     end
 
     self:SetClipInfo(load)
     if game.SinglePlayer() then
         self:CallOnClient("SetClipInfo", tostring(load))
     end
+
+	if (jammed) then
+		self:SetJammed(false)
+		return
+	end
 
     for i, k in pairs(self.Attachments) do
         if !k.Installed then continue end
@@ -380,11 +388,6 @@ end
 
 function SWEP:GetCapacity()
     local clip = self.RegularClipSize or self.Primary.ClipSize
-
-    if !self.RegularClipSize then
-        self.RegularClipSize = self.Primary.ClipSize
-    end
-
     local level = 1
 
     if self:GetBuff_Override("MagExtender") then
@@ -401,7 +404,7 @@ function SWEP:GetCapacity()
         clip = self.ExtendedClipSize
     end
 
-    clip = self:GetBuff("ClipSize", true, clip) or clip
+    clip = self:GetBuff("ClipSize", true) or clip
 
     local ret = self:GetBuff_Hook("Hook_GetCapacity", clip)
 

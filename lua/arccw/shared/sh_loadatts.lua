@@ -24,7 +24,6 @@ function ArcCW.LoadAttachmentType(att)
 
         att.ID = ArcCW.NumAttachments
 
-        if genAttCvar:GetBool() and !att.DoNotRegister and !att.InvAtt and !att.Free then
             local attent = {}
             attent.Base = "arccw_att_base"
             attent.Icon = att.Icon
@@ -42,7 +41,6 @@ function ArcCW.LoadAttachmentType(att)
             end
 
             scripted_ents.Register( attent, "acwatt_" .. shortname )
-        end
 
         ArcCW.NumAttachments = ArcCW.NumAttachments + 1
 

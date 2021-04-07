@@ -324,7 +324,7 @@ function SWEP:PlayIdleAnimation(pred)
         ianim = "idle_ubgl_empty"
     elseif self:GetBuff_Override("UBGL_BaseAnims") and self:GetInUBGL() and self.Animations.idle_ubgl then
         ianim = "idle_ubgl"
-    elseif (self:Clip1() == 0 or self:GetNeedCycle()) and self.Animations.idle_empty then
+    elseif (self:Clip1() == 0 or self:GetNeedCycle() or self:IsJammed()) and self.Animations.idle_empty then
         ianim = ianim or "idle_empty"
     else
         ianim = ianim or "idle"

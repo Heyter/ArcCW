@@ -38,10 +38,13 @@ function SWEP:GetViewModelPosition(pos, ang)
     local UCT = UnPredictedCurTime()
     local FT = FrameTime()
 	
-	local TargetTick = (1/FT)/66.66
-	if TargetTick < 1 then
-		FT = FT*TargetTick
-	end
+	if !SP then
+		local TargetTick = (1/FT)/66.66
+		if TargetTick < 1 then
+			local oldft = FT
+			FT = FT*TargetTick
+		end
+    end
 
     local gunbone, gbslot = self:GetBuff_Override("LHIK_GunDriver")
 
@@ -202,8 +205,8 @@ function SWEP:GetViewModelPosition(pos, ang)
 
         local delta = m_clamp((CT - self.ProcDrawTime) / (0.25 * self:GetBuff_Mult("Mult_DrawTime")), 0, 1)
 
-        targetpos  = LerpVector(delta, Vector(0, 0, -5), target.pos)
-        targetang  = LerpAngle(delta, Angle(-70, 30, 0), target.ang)
+        targetpos  = LerpVector(delta, Vector(0, -30, -30), target.pos)
+        targetang  = LerpAngle(delta, Angle(40, 30, 0), target.ang)
         targetdown = target.down
         targetsway = target.sway
         targetbob  = target.bob
@@ -216,8 +219,8 @@ function SWEP:GetViewModelPosition(pos, ang)
 
         local delta = 1 - m_clamp((CT - self.ProcHolsterTime) / (0.25 * self:GetBuff_Mult("Mult_DrawTime")), 0, 1)
 
-        target.pos = LerpVector(delta, Vector(0, 0, -5), target.pos)
-        target.ang = LerpAngle(delta, Angle(-70, 30, 10), target.ang)
+        target.pos = LerpVector(delta, Vector(0, -30, -30), target.pos)
+        target.ang = LerpAngle(delta, Angle(40, 30, 0), target.ang)
         target.down = target.down
         target.sway = target.sway
         target.bob = target.bob
@@ -315,16 +318,14 @@ function SWEP:GetViewModelPosition(pos, ang)
         local sprintmult = ((self:GetState() == ArcCW.STATE_SPRINT and 4) or 1)
         local strafing = owner:KeyDown(IN_MOVELEFT) or owner:KeyDown(IN_MOVERIGHT)
 
-        local vel = owner:GetVelocity()
-        local velup = math.Clamp(vel.z, -300, 300)
-        local velmult = math.Clamp(vel:Length() / 170, 0.1,2)
+        local velmult = math.Clamp(owner:GetVelocity():Length() / 170, 0.1,2)
         local pi = math.Clamp(math.pi * math.Round(velmult) * swayspeed, 1, 6)
         local movmt = (UCT * pi) / 0.5
         local movmtcomp = ((UCT * pi) - 0.25) / 0.5
 
         local xangdiff = m_angdif(eyeangles.x, lasteyeangles.x) * lookxmult
         local yangdiff = m_angdif(eyeangles.y, lasteyeangles.y) * lookymult
-        local rollamount = (strafing and vel:Angle().y) or eyeangles.y
+        local rollamount = (strafing and owner:GetVelocity():Angle().y) or eyeangles.y
         local rollangdiff = math.Clamp(m_angdif(eyeangles.y, rollamount ) / 180 * pi, -7, 7)
 
         coolswaypos.x = (0.25 * velmult) * m_cos(movmtcomp) * sprintmult * swayxmult * sightmult
@@ -335,12 +336,12 @@ function SWEP:GetViewModelPosition(pos, ang)
         swayangy_lerp = f_lerp(0.25, swayangy_lerp, yangdiff * sightmult)
         swayangz_lerp = f_lerp(0.025, swayangz_lerp, rollangdiff)
 
-        coolswayang.x = (math.abs((0.5 * velmult) * m_sin(movmt)) + swayangx_lerp * swayxmult) + (velup * -0.01 * swayzmult)
-        coolswayang.y = ((0.25 * velmult) * m_cos(movmt) * swayymult)
+        coolswayang.x = (math.abs((0.5 * velmult) * m_sin(movmt)) + swayangx_lerp * swayxmult)
+        coolswayang.y = ((0.25 * velmult) * m_cos(movmt) - swayangy_lerp + swayangz_lerp * swayymult)
         coolswayang.z = (math.min((2.5 * velmult) * m_cos(movmt), 0) + swayangy_lerp - swayangz_lerp * swayzmult) * swayrotate
 
         target.ang = target.ang + coolswayang
-        target.pos:Add(coolswaypos)
+        target.pos = target.pos + coolswaypos
     end
 
     -- For some reason, in multiplayer the sighting speed is twice as fast

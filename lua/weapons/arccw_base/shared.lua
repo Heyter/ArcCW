@@ -72,7 +72,7 @@ SWEP.PhysTracerProfile = 0 -- color for phys tracer.
 
 SWEP.TracerNum = 1 -- tracer every X
 SWEP.TracerFinalMag = 0 -- the last X bullets in a magazine are all tracers
-SWEP.Tracer = "arccw_tracer" -- override tracer (hitscan) effect
+SWEP.Tracer = nil -- override tracer (hitscan) effect
 SWEP.TracerCol = Color(255, 255, 255)
 SWEP.HullSize = 0 -- HullSize used by FireBullets
 
@@ -89,7 +89,7 @@ SWEP.AmmoPerShot = 1
 SWEP.InfiniteAmmo = false -- weapon can reload for free
 SWEP.BottomlessClip = false -- weapon never has to reload
 
-SWEP.DoNotEquipmentAmmo = false -- do not automatically give this weapon unique ammo when arccw_equipmentammo is used
+SWEP.DoNotEquipmentAmmo = false -- do not automatically give this weapon unique ammo
 
 SWEP.ShotgunReload = false -- reloads like shotgun instead of magazines
 SWEP.HybridReload = false -- reload normally when empty, reload like shotgun when part full
@@ -666,6 +666,11 @@ include("sh_bipod.lua")
 include("sh_grenade.lua")
 include("sh_ttt.lua")
 include("sh_util.lua")
+
+-- Jamming
+include("sh_jamming.lua")
+AddCSLuaFile("sh_jamming.lua")
+
 AddCSLuaFile("sh_model.lua")
 AddCSLuaFile("sh_timers.lua")
 AddCSLuaFile("sh_think.lua")
@@ -731,6 +736,10 @@ function SWEP:SetupDataTables()
     self:NetworkVar("Float", 2, "ReloadingREAL")
     self:NetworkVar("Float", 3, "MagUpIn")
     self:NetworkVar("Float", 4, "NextPrimaryFireSlowdown")
+
+	-- jaming
+	self:NetworkVar("Bool", 7, "Jammed")
+	self:NetworkVar("Float", 5, "JamFactor")
 end
 
 function SWEP:OnRestore()

@@ -92,10 +92,10 @@ function SWEP:GetIsManualAction()
 end
 
 -- ONE FUNCTION TO RULE THEM ALL
-function SWEP:GetBuff(buff, defaultnil, defaultvar)
+function SWEP:GetBuff(buff, defaultnil)
     local stable = self:GetTable()
 
-    local result = stable[buff] or defaultvar
+    local result = stable[buff]
     if !result and defaultnil then
         result = nil
     elseif !result then
@@ -150,7 +150,7 @@ function SWEP:GetBuff_Hook(buff, data)
             data = ret
         end
 
-        data = hook.Call(buff, ArcCW, self, data) or data
+        hook.Call(buff, ArcCW, self, data)
 
         return data
     else
@@ -236,7 +236,7 @@ function SWEP:GetBuff_Hook(buff, data)
         end
     end
 
-    data = hook.Call(buff, ArcCW, self, data) or data
+    hook.Call(buff, ArcCW, self, data)
 
     return data
 end
@@ -646,11 +646,10 @@ function SWEP:GetMuzzleDevice(wm)
 end
 
 function SWEP:GetTracerOrigin()
-    local ow = self:GetOwner()
-    local wm = !ow:GetViewModel():IsValid() or ow:ShouldDrawLocalPlayer()
+    local wm = self:GetOwner():ShouldDrawLocalPlayer()
     local muzz = self:GetMuzzleDevice(wm)
 
-    if muzz and muzz:IsValid() then
+    if muzz then
         local posang = muzz:GetAttachment(1)
         if !posang then return muzz:GetPos() end
         local pos = posang.Pos
@@ -1177,7 +1176,6 @@ end
 function SWEP:Detach(slot, silent, noadjust)
     if !slot then return end
     if !self.Attachments[slot] then return end
-
     if !self.Attachments[slot].Installed then return end
 
     if !ArcCW:PlayerCanAttach(self:GetOwner(), self, self.Attachments[slot].Installed, slot, true) then

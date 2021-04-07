@@ -19,6 +19,17 @@ function SWEP:CanPrimaryAttack()
     -- Too early, come back later.
     if self:GetNextPrimaryFire() >= CurTime() then return end
 
+	-- Jamming
+	if self:CheckJammed() then
+		if (IsFirstTimePredicted()) then
+			self:EmitSound(self.Primary.Sound_Jammed)
+		end
+
+		--self:SetNextPrimaryFire(CurTime() + 0.5)
+		self:SetReloading(CurTime() + 0.5)
+		return
+	end
+
     -- Gun is locked from heat.
     if self:GetHeatLocked() then return end
 
@@ -140,9 +151,8 @@ function SWEP:PrimaryAttack()
     bullet.Distance   = 33000
     bullet.AmmoType   = self.Primary.Ammo
     bullet.HullSize   = (self:GetBuff_Override("Override_HullSize") or self.HullSize or 0) + self:GetBuff_Add("Add_HullSize")
-    bullet.Tracer     = tracernum or 0
+    bullet.Tracer     = game.SinglePlayer() and tracernum or 0
     bullet.TracerName = self:GetBuff_Override("Override_Tracer") or self.Tracer
-    bullet.Weapon     = self
     bullet.Callback   = function(att, tr, dmg)
         local hitpos, hitnormal = tr.HitPos, tr.HitNormal
         local trent = tr.Entity
@@ -156,14 +166,13 @@ function SWEP:PrimaryAttack()
             debugoverlay.Cross(hitpos, 5, 5, Color(0, 0, 255), true)
         end
 
-        --[[if !game.SinglePlayer() and CLIENT and !(tracernum == 0 or clip % tracernum != 0) then
+        if !game.SinglePlayer() and CLIENT and !(tracernum == 0 or clip % tracernum != 0) then
             local fx = EffectData()
             fx:SetStart(self:GetTracerOrigin())
             fx:SetOrigin(tr.HitPos)
             fx:SetScale(5000)
-            fx:SetEntity(self)
             util.Effect(bullet.TracerName or "tracer", fx)
-        end]]
+        end
 
         local randfactor = self:GetBuff("DamageRand")
         local mul = 1
@@ -190,8 +199,10 @@ function SWEP:PrimaryAttack()
         local effect = self.ImpactEffect
         local decal  = self.ImpactDecal
 
-        if dmg:IsDamageType(DMG_BURN) and hit.range <= self.Range then
-            dmg:SetDamageType(dmg:GetDamageType() - DMG_BURN)
+        if dmg:GetDamageType() == DMG_BURN and hit.range <= self.Range then
+            local dmgtype = num == 1 and DMG_BULLET or DMG_BUCKSHOT
+
+            dmg:SetDamageType(dmgtype)
 
             effect = "arccw_incendiaryround"
             decal  = "FadingScorch"
@@ -299,6 +310,9 @@ function SWEP:PrimaryAttack()
         end
     end
 
+	-- Jamming
+	self:UpdateJamFactor()
+
     self:DoRecoil()
 
     self:SetNthShot(self:GetNthShot() + 1)
@@ -336,6 +350,9 @@ function SWEP:PrimaryAttack()
     end
 
     self:ApplyAttachmentShootDamage()
+
+	-- Jamming
+	self:RollJamChance()
 
     self:AddHeat(1)
 
@@ -443,8 +460,7 @@ function SWEP:DoPrimaryFire(isent, data)
     if isent then
         self:FireRocket(data.ent, data.vel, data.ang, self.PhysBulletDontInheritPlayerVelocity)
     else
-        -- if !game.SinglePlayer() and !IsFirstTimePredicted() then return end
-        if !IsFirstTimePredicted() then return end
+        if !game.SinglePlayer() and !IsFirstTimePredicted() then return end
 
         if shouldphysical then
             local vel = self:GetBuff_Override("Override_PhysBulletMuzzleVelocity") or self.PhysBulletMuzzleVelocity
